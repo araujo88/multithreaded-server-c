@@ -18,8 +18,8 @@ In "single-thread" folder, run `./server`. This will make the single-threaded se
 
 ```
 real	0m2.262s
-user	0m0.004s
-sys	  0m0.004s
+user  0m0.004s
+sys 0m0.004s
 ```
 
 ### Multi-threaded server
@@ -29,7 +29,7 @@ For the multi-threaded server, go to the folder "multithread" and run `./server`
 ```
 real	0m0.018s
 user	0m0.000s
-sys	  0m0.008s
+sys 0m0.008s
 ```
 
 As seen from the results, the multi-threaded server was around 125 times faster than the single-threaded server.
