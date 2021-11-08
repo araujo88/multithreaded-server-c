@@ -13,6 +13,7 @@
 
 #define PORT 9002
 #define BUFFER_SIZE 1024
+#define MAX_CONNECTIONS 1
 
 int server_socket; // global variable in order to be handled after SIGINT
 
@@ -21,10 +22,12 @@ void check_socket(int server_socket);                                           
 void check_bind(int server_socket, struct sockaddr_in *server_address);                    // check binding
 void check_listen(int server_socket, int number_connections);                              // check connection listening
 void check_accept(int server_socket, int *client_socket, struct sockaddr *client_address); // check accepting connection
-void send_HTML(int client_socket);                                                         // sends HTML data
+void *send_HTML(void *p_client_socket);                                                    // sends HTML data
+void display_request(int client_socket, struct sockaddr *client_address);                  // displays client request
 
 int main(int argc, char *argv[])
 {
+    int message_num = 0;
     puts("Creating socket ...");
     server_socket = socket(AF_INET, SOCK_STREAM, 0);
     check_socket(server_socket);
@@ -43,7 +46,7 @@ int main(int argc, char *argv[])
     while (true)
     {
         puts("Waiting for incoming requests... (press Ctrl+C to quit)\n");
-        check_listen(server_socket, 5);
+        check_listen(server_socket, MAX_CONNECTIONS);
 
         int client_socket;
         struct sockaddr_in *client_address = NULL;
@@ -51,9 +54,16 @@ int main(int argc, char *argv[])
         check_accept(server_socket, &client_socket, (struct sockaddr *)client_address);
         puts("Request accepted!\n");
 
-        puts("Sending message ...\n");
-        send_HTML(client_socket);
+        printf("Sending message n. %d ...\n\n", message_num);
+
+        pthread_t t;
+        int *pclient = malloc(sizeof(int));
+        *pclient = client_socket;
+        pthread_create(&t, NULL, send_HTML, (void *)pclient);
+
         puts("Message send!\n");
+        close(client_socket);
+        message_num++;
     }
     return 0;
 }
@@ -112,12 +122,14 @@ void check_accept(int server_socket, int *client_socket, struct sockaddr *client
     {
         perror("Accept failed");
         printf("Error code: %d\n", errno);
-        exit(1);
     }
 }
 
-void send_HTML(int client_socket)
+void *send_HTML(void *p_client_socket)
 {
+    int client_socket = *(int *)p_client_socket;
+    free(p_client_socket);
+
     char server_message[BUFFER_SIZE];
     char *current_date;
     char *content;
@@ -132,4 +144,25 @@ void send_HTML(int client_socket)
 
     send(client_socket, &server_message, sizeof(server_message), 0); // sends the message
     memset(server_message, 0, sizeof(server_message));               // sets server data to null pointer (cleanup)
+}
+
+void display_request(int client_socket, struct sockaddr *client_address)
+{
+    struct sockaddr_in *pV4Addr = (struct sockaddr_in *)&client_address;
+    struct in_addr ipAddr = pV4Addr->sin_addr;
+    char client_ip_address[INET_ADDRSTRLEN];
+    inet_ntop(AF_INET, &ipAddr, client_ip_address, INET_ADDRSTRLEN);
+    printf("Client IP address: %s\n\n", client_ip_address);
+
+    char client_message[BUFFER_SIZE];
+    memset(client_message, 0, sizeof(client_message)); // sets client message to null pointer
+    if ((recv(client_socket, &client_message, sizeof(client_message), 0)) < 0)
+    {
+        perror("Receive error:");
+        printf("Error code: %d\n", errno);
+        exit(1);
+    }
+
+    printf("Data sent by the client:\n\n%s", client_message);
+    memset(client_message, 0, sizeof(client_message)); // sets client message to null pointer
 }
