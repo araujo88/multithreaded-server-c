@@ -15,6 +15,8 @@
 #define BUFFER_SIZE 1024
 #define MAX_CONNECTIONS 1
 
+//pthread_mutex_t server_mutex = PTHREAD_MUTEX_INITIALIZER;
+
 int server_socket; // global variable in order to be handled after SIGINT
 
 void handle_signal(int sig);                                                               // interrupt signal handler
@@ -22,7 +24,7 @@ void check_socket(int server_socket);                                           
 void check_bind(int server_socket, struct sockaddr_in *server_address);                    // check binding
 void check_listen(int server_socket, int number_connections);                              // check connection listening
 void check_accept(int server_socket, int *client_socket, struct sockaddr *client_address); // check accepting connection
-void *send_HTML(void *p_client_socket);                                                    // sends HTML data
+void *send_HTML(void *client_socket);                                                      // sends HTML data
 void display_request(int client_socket, struct sockaddr *client_address);                  // displays client request
 
 int main(int argc, char *argv[])
@@ -48,21 +50,16 @@ int main(int argc, char *argv[])
         puts("Waiting for incoming requests... (press Ctrl+C to quit)\n");
         check_listen(server_socket, MAX_CONNECTIONS);
 
-        int client_socket;
+        int *client_socket = malloc(sizeof(int));
         struct sockaddr_in *client_address = NULL;
 
-        check_accept(server_socket, &client_socket, (struct sockaddr *)client_address);
+        check_accept(server_socket, client_socket, (struct sockaddr *)client_address);
         puts("Request accepted!\n");
 
         printf("Sending message n. %d ...\n\n", message_num);
 
         pthread_t t;
-        int *pclient = malloc(sizeof(int));
-        *pclient = client_socket;
-        pthread_create(&t, NULL, send_HTML, (void *)pclient);
-
-        puts("Message send!\n");
-        close(client_socket);
+        pthread_create(&t, NULL, send_HTML, (void *)client_socket);
         message_num++;
     }
     return 0;
@@ -125,11 +122,9 @@ void check_accept(int server_socket, int *client_socket, struct sockaddr *client
     }
 }
 
-void *send_HTML(void *p_client_socket)
+void *send_HTML(void *client_socket)
 {
-    int client_socket = *(int *)p_client_socket;
-    free(p_client_socket);
-
+    //pthread_mutex_lock(&server_mutex);
     char server_message[BUFFER_SIZE];
     char *current_date;
     char *content;
@@ -141,9 +136,12 @@ void *send_HTML(void *p_client_socket)
 
     content = "Hello from the server!"; // define response content (HTML)
     sprintf(server_message, "HTTP/1.0 200 OK\nDate: %s\nContent-Type: text/html\nContent-Length: %ld\n\n%s", current_date, strlen(content), content);
-
-    send(client_socket, &server_message, sizeof(server_message), 0); // sends the message
-    memset(server_message, 0, sizeof(server_message));               // sets server data to null pointer (cleanup)
+    send(*(int *)client_socket, &server_message, sizeof(server_message), 0); // sends the message
+    puts("Message sent!\n");
+    memset(server_message, 0, sizeof(server_message)); // sets server data to null pointer (cleanup)
+    close(*(int *)client_socket);
+    free(client_socket);
+    //pthread_mutex_unlock(&server_mutex);
 }
 
 void display_request(int client_socket, struct sockaddr *client_address)
