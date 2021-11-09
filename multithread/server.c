@@ -119,6 +119,7 @@ void check_accept(int server_socket, int *client_socket, struct sockaddr *client
     {
         perror("Accept failed");
         printf("Error code: %d\n", errno);
+        exit(1);
     }
 }
 
